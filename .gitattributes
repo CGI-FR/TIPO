@@ -7,6 +7,8 @@
 # The above will handle all files NOT found below
 #
 
+githooks/** text eol=lf
+
 # Documents
 *.bibtex   text diff=bibtex
 *.doc      diff=astextplain
@@ -30,7 +32,6 @@
 *.tsv      text
 *.txt      text
 *.sql      text
-*.epub     diff=astextplain
 
 # Graphics
 *.png      binary
@@ -81,17 +82,13 @@
 .gitattributes export-ignore
 .gitignore     export-ignore
 .gitkeep       export-ignore
+
 # Treat all Go files in this repo as binary, with no git magic updating
 # line endings. Windows users contributing to Go will need to use a
 # modern version of git and editors capable of LF line endings.
 
 *.go -text diff=golang
-# Apply override to all files in the directory
-*.md linguist-detectable
-# Basic .gitattributes for sql files
 
-*.sql linguist-detectable=true
-*.sql linguist-language=sql
 ## GITATTRIBUTES FOR WEB PROJECTS
 #
 # These settings are for any web project.
@@ -136,7 +133,6 @@
 *.scm             text
 *.scss            text diff=css
 *.sh              text eol=lf
-.husky/*          text eol=lf
 *.sql             text
 *.styl            text
 *.tag             text
@@ -149,7 +145,7 @@
 Dockerfile        text
 
 # Documentation
-*.ipynb           text eol=lf
+*.ipynb           text
 *.markdown        text diff=markdown
 *.md              text diff=markdown
 *.mdwn            text diff=markdown
@@ -204,7 +200,7 @@ TODO              text
 .htaccess         text
 *.lock            text -diff
 package.json      text eol=lf
-package-lock.json text eol=lf -diff
+package-lock.json text -diff
 pnpm-lock.yaml    text eol=lf -diff
 .prettierrc       text
 yarn.lock         text -diff
@@ -299,6 +295,3 @@ Procfile          text
 
 # Ignore files (like .npmignore or .gitignore)
 *.*ignore         text
-
-# Git Hooks
-githooks/**       text eol=lf

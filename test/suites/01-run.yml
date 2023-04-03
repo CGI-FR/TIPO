@@ -1,0 +1,256 @@
+name: run
+testcases:
+  - name: swap attribute only
+    steps:
+      - script: |-
+          cat > dataset.jsonl <<EOF
+          {"nom":"Noémie","prenom":"Lacroix"}
+          {"nom":"John","prenom":"Petersburg"}
+          {"nom":"Lesagin","prenom":"Martin"}
+          EOF
+
+      - script: |-
+          cat > swapping.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - $.nom
+          EOF
+
+      - script: cat dataset.jsonl | tipo -c swapping.yml
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldNotBeNil
+          - result.systemout ShouldContainSubstring {"nom":"Noémie","prenom":"Lacroix"}
+          - result.systemout ShouldContainSubstring {"nom":"Lesagin","prenom":"Petersburg"}
+          - result.systemout ShouldContainSubstring {"nom":"John","prenom":"Martin"}
+
+  - name: swap using pimo
+    steps:
+      - script: |
+          pimo --seed 42 --empty-input --repeat 10 --mask 'nom=[{add: ""},{randomChoiceInUri: "pimo://surnameFR"}]' --mask 'prenom=[{add: ""},{randomChoiceInUri: "pimo://nameFR"}]' | tipo -c swapping.yml
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"nom":"Bonnet","prenom":"Aymeric"}
+          - result.systemout ShouldContainSubstring {"nom":"Morin","prenom":"Carlos"}
+          - result.systemout ShouldContainSubstring {"nom":"Bourgeois","prenom":"Gilberte"}
+          - result.systemout ShouldContainSubstring {"nom":"Lemaire","prenom":"Patrick"}
+          - result.systemout ShouldContainSubstring {"nom":"Boyer","prenom":"Anaïs"}
+          - result.systemout ShouldContainSubstring {"nom":"Schmitt","prenom":"Régis"}
+          - result.systemout ShouldContainSubstring {"nom":"Denis","prenom":"Émilien"}
+          - result.systemout ShouldContainSubstring {"nom":"Colin","prenom":"Flavien"}
+          - result.systemout ShouldContainSubstring {"nom":"Rousseau","prenom":"Samantha"}
+          - result.systemout ShouldContainSubstring {"nom":"Duval","prenom":"Marie-Jeanne"}
+
+  - name: swap relation
+    steps:
+      - script: |-
+          cat > dataset.jsonl <<EOF
+          {"company":"acme","secondField":null,"address":{"street":"main"},"org":["A",["B","C"]],"employees":[{"name":"one","children":[{"name":"child 1"},{"name":"child 2"}]},{"name":"two","children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+          {"company":"megacorp","secondField":1,"address":{"street":"broadway"},"org":["X",["Y",{"_":"Z"}]],"employees":[{"name":"alpha","children":[{"name":"kid 1"}]},{"name":"beta","children":[{"name":"kid 2"},{"name":"kid 3"}]}]}
+          {"company":"dynatech","secondField":true,"address":{"street":"elm"},"org":["P",{"_":["Q","R"]}],"employees":[{"name":"first","children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","children":[]}]}
+          EOF
+
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - $.employees.*.children
+          EOF
+      - script: cat dataset.jsonl | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"acme","secondField":null,"address":{"street":"main"},"org":["A",["B","C"]],"employees":[{"name":"one","children":[{"name":"kid 2"},{"name":"kid 3"}]},{"name":"two","children":[{"name":"child 1"},{"name":"child 2"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"megacorp","secondField":1,"address":{"street":"broadway"},"org":["X",["Y",{"_":"Z"}]],"employees":[{"name":"alpha","children":[]},{"name":"beta","children":[{"name":"kid 1"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","secondField":true,"address":{"street":"elm"},"org":["P",{"_":["Q","R"]}],"employees":[{"name":"first","children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+
+  - name: swap attribute + relation
+    steps:
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - $.employees.*.children
+            - $.company
+          EOF
+
+      - script: cat dataset.jsonl  | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"acme","secondField":null,"address":{"street":"main"},"org":["A",["B","C"]],"employees":[{"name":"one","children":[{"name":"kid 2"},{"name":"kid 3"}]},{"name":"two","children":[{"name":"child 1"},{"name":"child 2"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","secondField":1,"address":{"street":"broadway"},"org":["X",["Y",{"_":"Z"}]],"employees":[{"name":"alpha","children":[]},{"name":"beta","children":[{"name":"kid 1"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"megacorp","secondField":true,"address":{"street":"elm"},"org":["P",{"_":["Q","R"]}],"employees":[{"name":"first","children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+
+  - name: swap elements of an array
+    steps:
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - $.employees.*.children.*
+            - $.company
+          EOF
+
+      - script: cat dataset.jsonl  | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"acme","secondField":null,"address":{"street":"main"},"org":["A",["B","C"]],"employees":[{"name":"one","children":[{"name":"offspring 2"},{"name":"child 2"}]},{"name":"two","children":[{"name":"child 5"},{"name":"kid 2"},{"name":"child 3"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","secondField":1,"address":{"street":"broadway"},"org":["X",["Y",{"_":"Z"}]],"employees":[{"name":"alpha","children":[{"name":"kid 3"}]},{"name":"beta","children":[{"name":"kid 1"},{"name":"child 4"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"megacorp","secondField":true,"address":{"street":"elm"},"org":["P",{"_":["Q","R"]}],"employees":[{"name":"first","children":[{"name":"child 1"},{"name":"offspring 1"}]},{"name":"second","children":[]}]}
+
+  - name: swap coherent group
+    steps:
+      - script: |-
+          cat > dataset.jsonl <<EOF
+          {"company":"acme","employees":[{"name":"one","childnumber":2,"children":[{"name":"child 1"},{"name":"child 2"}]},{"name":"two","childnumber":3,"children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+          {"company":"megacorp","employees":[{"name":"alpha","childnumber":1,"children":[{"name":"kid 1"}]},{"name":"beta","childnumber":2,"children":[{"name":"kid 2"},{"name":"kid 3"}]}]}
+          {"company":"dynatech","employees":[{"name":"first","childnumber":2,"children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","childnumber":0,"children":[]}]}
+          EOF
+
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - group:
+              - $.employees.*.childnumber
+              - $.employees.*.children
+          EOF
+
+      - script: cat dataset.jsonl  | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"acme","employees":[{"name":"one","childnumber":2,"children":[{"name":"kid 2"},{"name":"kid 3"}]},{"name":"two","childnumber":2,"children":[{"name":"child 1"},{"name":"child 2"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"megacorp","employees":[{"name":"alpha","childnumber":0,"children":[]},{"name":"beta","childnumber":1,"children":[{"name":"kid 1"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","employees":[{"name":"first","childnumber":2,"children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","childnumber":3,"children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+
+  - name: swap coherent group - different way to write config
+    steps:
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - ["$.employees.*.childnumber","$.employees.*.children"]
+          EOF
+
+      - script: cat dataset.jsonl  | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"acme","employees":[{"name":"one","childnumber":2,"children":[{"name":"kid 2"},{"name":"kid 3"}]},{"name":"two","childnumber":2,"children":[{"name":"child 1"},{"name":"child 2"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"megacorp","employees":[{"name":"alpha","childnumber":0,"children":[]},{"name":"beta","childnumber":1,"children":[{"name":"kid 1"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","employees":[{"name":"first","childnumber":2,"children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","childnumber":3,"children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+
+  - name: swap coherent group - another way to write config
+    steps:
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - children: ["$.employees.*.childnumber","$.employees.*.children"]
+          EOF
+
+      - script: cat dataset.jsonl  | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"acme","employees":[{"name":"one","childnumber":2,"children":[{"name":"kid 2"},{"name":"kid 3"}]},{"name":"two","childnumber":2,"children":[{"name":"child 1"},{"name":"child 2"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"megacorp","employees":[{"name":"alpha","childnumber":0,"children":[]},{"name":"beta","childnumber":1,"children":[{"name":"kid 1"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","employees":[{"name":"first","childnumber":2,"children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","childnumber":3,"children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+
+  - name: swap group and attributes separately
+    steps:
+      - script: |-
+          cat > dataset.jsonl <<EOF
+          {"company":"acme","employees":[{"name":"one","childnumber":2,"children":[{"name":"child 1"},{"name":"child 2"}]},{"name":"two","childnumber":3,"children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+          {"company":"megacorp","employees":[{"name":"alpha","childnumber":1,"children":[{"name":"kid 1"}]},{"name":"beta","childnumber":2,"children":[{"name":"kid 2"},{"name":"kid 3"}]}]}
+          {"company":"dynatech","employees":[{"name":"first","childnumber":2,"children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","childnumber":0,"children":[]}]}
+          EOF
+
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - $.employees.*.childnumber
+            - $.employees.*.children
+          EOF
+
+      - script: cat dataset.jsonl  | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"acme","employees":[{"name":"one","childnumber":2,"children":[{"name":"kid 2"},{"name":"kid 3"}]},{"name":"two","childnumber":2,"children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"megacorp","employees":[{"name":"alpha","childnumber":0,"children":[]},{"name":"beta","childnumber":1,"children":[{"name":"child 1"},{"name":"child 2"}]}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","employees":[{"name":"first","childnumber":2,"children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","childnumber":3,"children":[{"name":"kid 1"}]}]}
+
+  - name: swap multiple groups
+    steps:
+      - script: |-
+          cat > dataset.jsonl <<EOF
+          {"company":"acme","employees":[{"name":"one","surname":"ONE","age":20,"nationality":"Kenyan"},{"name":"two","surname":"TWO","age":30,"nationality":"Icelandic"}]}
+          {"company":"megacorp","employees":[{"name":"alpha","surname":"ALPHA","age":40,"nationality":"Colombian"},{"name":"beta","surname":"BETA","age":50,"nationality":"Malaysian"}]}
+          {"company":"dynatech","employees":[{"name":"first","surname":"FIRST","age":60,"nationality":"Belgian"},{"name":"second","surname":"SECOND","age":70,"nationality":"Egyptian"}]}
+          EOF
+
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - group1:
+              - employees.*.name
+              - employees.*.surname
+            - group2:
+              - employees.*.age
+              - employees.*.nationality
+          EOF
+
+      - script: cat dataset.jsonl | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"acme","employees":[{"name":"beta","surname":"BETA","age":50,"nationality":"Malaysian"},{"name":"one","surname":"ONE","age":30,"nationality":"Icelandic"}]}
+          - result.systemout ShouldContainSubstring {"company":"megacorp","employees":[{"name":"second","surname":"SECOND","age":70,"nationality":"Egyptian"},{"name":"alpha","surname":"ALPHA","age":20,"nationality":"Kenyan"}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","employees":[{"name":"first","surname":"FIRST","age":60,"nationality":"Belgian"},{"name":"two","surname":"TWO","age":40,"nationality":"Colombian"}]}
+
+  - name: swap multiple groups and individuals
+    steps:
+      - script: |-
+          cat > dataset.jsonl <<EOF
+          {"company":"acme","employees":[{"name":"one","surname":"ONE","age":20,"nationality":"Kenyan"},{"name":"two","surname":"TWO","age":30,"nationality":"Icelandic"}]}
+          {"company":"megacorp","employees":[{"name":"alpha","surname":"ALPHA","age":40,"nationality":"Colombian"},{"name":"beta","surname":"BETA","age":50,"nationality":"Malaysian"}]}
+          {"company":"dynatech","employees":[{"name":"first","surname":"FIRST","age":60,"nationality":"Belgian"},{"name":"second","surname":"SECOND","age":70,"nationality":"Egyptian"}]}
+          EOF
+
+      - script: |-
+          cat > swap.yml <<EOF
+          version: 1
+          seed: 42
+          frameSize: 1000
+          selectors:
+            - group1:
+              - employees.*.name
+              - employees.*.surname
+            - group2:
+              - employees.*.age
+              - employees.*.nationality
+            - company
+          EOF
+
+      - script: cat dataset.jsonl | tipo
+        assertions:
+          - result.code ShouldEqual 0
+          - result.systemout ShouldContainSubstring {"company":"megacorp","employees":[{"name":"beta","surname":"BETA","age":50,"nationality":"Malaysian"},{"name":"one","surname":"ONE","age":30,"nationality":"Icelandic"}]}
+          - result.systemout ShouldContainSubstring {"company":"acme","employees":[{"name":"second","surname":"SECOND","age":70,"nationality":"Egyptian"},{"name":"alpha","surname":"ALPHA","age":20,"nationality":"Kenyan"}]}
+          - result.systemout ShouldContainSubstring {"company":"dynatech","employees":[{"name":"first","surname":"FIRST","age":60,"nationality":"Belgian"},{"name":"two","surname":"TWO","age":40,"nationality":"Colombian"}]}

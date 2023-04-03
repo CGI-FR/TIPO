@@ -1,14 +1,15 @@
-module github.com/adrienaury/go-template
+module github.com/cgi-fr/tipo
 
-go 1.19
+go 1.20
 
 require (
-	github.com/gorilla/mux v1.8.0
-	github.com/rs/zerolog v1.28.0
+	github.com/ohler55/ojg v1.18.2
+	github.com/rs/zerolog v1.25.0
+	github.com/spf13/cobra v1.6.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
-	github.com/mattn/go-colorable v0.1.12 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
-	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
+	github.com/inconshreveable/mousetrap v1.0.1 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 )

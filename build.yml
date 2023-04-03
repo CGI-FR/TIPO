@@ -30,6 +30,7 @@ properties:
   PROJECT: "" # Leave empty to default to the git repository name (e.g. "<reponame>")
   LDFLAGS: "" # Add custom standard ldflags, will be applied everywhere everytime
   BUILD_DIR: "bin" # Subfolder where the build will output, should be ignored by .gitignore
+  TEST_WS_DIR: "test/workspace" # Workspace for integration tests
 
   # Build parameters (use the -props flag or change these default values)
   tag: "" # Default to the current branch or tag, can be overriden
@@ -62,6 +63,7 @@ properties:
     deny: [] # example: ["LGPL-2.1"]
     override: {} # example:  github.com/rs/zerolog: LGPL-2.1
     translate: {} # example: gopkg.in/foo/bar.v2: github.com/foo/bar
+  testsuites: "*.yml" # test suites to execute on test-int target
 
 shell: ["zsh", "-c"]
 
@@ -194,6 +196,7 @@ targets:
         then:
           - $: "go mod init ={mod}"
       - $: "go mod tidy"
+      - $: "rm -f venom*.log || :"
 
   # run "neon -props '{buildpaths: ["path/to/main/package1","path/to/main/package2"]}' compile" to compile specific targets
   # example : neon -props '{buildpaths: ["cmd/cli"]}' compile
@@ -245,7 +248,13 @@ targets:
     doc: "Run all integration tests"
     depends: ["info", "refresh", "lint", "test", "release"]
     steps:
-      - $: venom run test/suites/*
+      - delete: venom*.log
+      - delete: ={TEST_WS_DIR}/**
+      - mkdir: =TEST_WS_DIR
+      - copy: "**/*.yml"
+        dir: "test/suites"
+        todir: =TEST_WS_DIR
+      - $: venom run --stop-on-failure ={TEST_WS_DIR}/={testsuites}
 
   # run "neon -props '{buildpaths: ["path/to/main/package1","path/to/main/package2"]}' publish" to publish specific targets
   # example : neon -props '{buildpaths: ["cmd/cli"]}' publish
@@ -253,7 +262,6 @@ targets:
     doc: "Publish tagged binaries to Github"
     depends: ["info", "refresh", "lint", "test", "release", "test-int"]
     steps:
-      - $: git clean -f -d
       - if: len(buildpaths) == 0
         then:
           - buildpaths = appendpath("cmd", find("cmd", "*"))
@@ -262,6 +270,7 @@ targets:
       - $: (export LDFLAGS="={ldflags}"; export BUILDPATHS="={buildpaths}"; cat .goreleaser.template.yml | gomplate)
         1>: ={BUILD_DIR}/.goreleaser.yml
         1x: true
+      - $: git reset --hard
       - if: snapshot
         then:
           - $: goreleaser release -f ={BUILD_DIR}/.goreleaser.yml --rm-dist --snapshot

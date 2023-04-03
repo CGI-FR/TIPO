@@ -1,3 +1,11 @@
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/CGI-FR/TIPO/ci.yml?branch=main)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cgi-fr/tipo)](https://goreportcard.com/report/github.com/cgi-fr/tipo)
+![GitHub all releases](https://img.shields.io/github/downloads/CGI-FR/TIPO/total)
+![GitHub](https://img.shields.io/github/license/CGI-FR/TIPO)
+![GitHub Repo stars](https://img.shields.io/github/stars/CGI-FR/TIPO)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/CGI-FR/TIPO)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/CGI-FR/TIPO)
+
 # TIPO: Tidy Input Permuted Output
 
 This tool provides reproducible data swapping on a JSONLine stream.

@@ -162,15 +162,15 @@ selectors:
 The permutation of the two groups will be performed independently, as for the single attribute `company`. The execution is done as follows:
 
 ```console
-< stream.jsonl | type
+< stream.jsonl | tipo -c configuration.yml
 ```
 
 And the result will be the following:
 
 ```json
-{"company":"acme","employees":[{"name":"beta","surname":"BETA","age":50,"nationality":"Malaysian"},{"name":"one","surname":"ONE","age":30,"nationality":"Icelandic"}]}
-{"company":"megacorp","employees":[{"name":"second","surname":"SECOND","age":70,"nationality":"Egyptian"},{"name":"alpha","surname":"ALPHA","age":20,"nationality":"Kenyan"}]}
-{"company":"dynatech","employees":[{"name":"first","surname":"FIRST","age":60,"nationality":"Belgian"},{"name":"two","surname":"TWO","age":40,"nationality":"Colombian"}]}
+{"company":"dynatech","employees":[{"name":"beta","surname":"BETA","age":50,"nationality":"Malaysian"},{"name":"one","surname":"ONE","age":30,"nationality":"Icelandic"}]}
+{"company":"acme","employees":[{"name":"second","surname":"SECOND","age":70,"nationality":"Egyptian"},{"name":"alpha","surname":"ALPHA","age":20,"nationality":"Kenyan"}]}
+{"company":"megacorp","employees":[{"name":"first","surname":"FIRST","age":60,"nationality":"Belgian"},{"name":"two","surname":"TWO","age":40,"nationality":"Colombian"}]}
 ```
 
 Note that the `age` and `nationality` fields have been swapped consistently and independently of the `surname` and `name` fields, which have also been swapped consistently.

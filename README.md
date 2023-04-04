@@ -15,104 +15,132 @@ This tool provides reproducible data swapping on a JSONLine stream.
 Here is an example YAML configuration file
 
 ```YAML
-version: 1
-seed: 42
-frameSize: 1000
-selectors:
-  - group1:
-    - attribute1.*
-    - attribute2.*
-  - attribute3.*
-  - attribute4.*
+version: 1          # version of the configuration, only 1 is allowed for now
+seed: 42            # starting seed of the pseudo-random process, ensure coherence between executions
+frameSize: 1000     # frameSize is the size of the processing window, should be as large as possible
+selectors:          # each selector in this list will trigger a permutation between JSONLines
+  - $.name          # a selector is defined by a jsonpath expression
+  - $.surname
+  - group:          # a group of selectors will swap attributes together
+    - $.age
+    - $.nationality
 ```
 
-- The `seed` parameter is the starting seed of the pseudo-random process.
-- The `frameSize` parameter is an essential element affecting the quality of the permutation, it is the size of the processing window. To ensure good permutation quality, its value must be large, in order to have a greater number of values ready to be permuted and to reduce the chance of having permutations with identical data at the origin.
-- The `selectors` parameter can be a group of attributes to be swapped together or attributes to be swapped independently of each other.
+Notes :
 
-## Execution example
+- `seed` is optional, use it only if you need a reproducible execution (every execution gives the same result), change the value to get different results
+- `frameSize` parameter is an essential element affecting the quality of the permutation, it is the size of the processing window. To ensure good permutation quality, its value must be large, in order to have a greater number of values ready to be permuted and to reduce the chance of having permutations with identical data at the origin.
+
+## Example 1 : redistribute siblings to new parents
 
 Suppose our input stream of type JSONLine is stored in a "stream.jsonl" file
 
-```JSON
-{"company":"Ese1","employees":[{"lastname":"Martin","firstname":"Lebaron","age":36,"children":[{"lastname":"agathe" ,"age":14}]},{"surname":"Josselin","firstname":"Jireau","age":57,"children":[{"surname":"Pierre","age" :14},{"name":"Damien","age":9}]}]}
-{"company":"Ese2","employees":[{"surname":"Jérémie","firstname":"Namie","age":42,"children":[{"surname":"Patrice" ,"age":25},{"name":"Alex","age":10},{"name":"Lilie","age":2}]}]}
-{"company":"Ese3","employees":[{"surname":"Océane","firstname":"Dupont","age":42,"children":[{"surname":"Alice" ,"age":25},{"name":"Maélie","age":10}]}]}
+```json
+{"company":"acme","employees":[{"name":"one","children":[{"name":"child 1"},{"name":"child 2"}]},{"name":"two","children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+{"company":"megacorp","employees":[{"name":"alpha","children":[{"name":"kid 1"}]},{"name":"beta","children":[{"name":"kid 2"},{"name":"kid 3"}]}]}
+{"company":"dynatech","employees":[{"name":"first","children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","children":[]}]}
 ```
 
-and the following configuration file is named "swapConf.yml":
+and the following configuration file is named "swap.yml":
 
 ```YAML
 version: 1
 seed: 42
 frameSize: 1000
 selectors:
-   - employees.children.name.*
+  - $.employees.*.children
 ```
 
-In this case we do not want to swap a group of attributes, but only the names of the children of the employees.
+In this case we want to swap children of the employees. Siblings will not be separated in this scenario because the JSONPath `$.employees.*.children` will select whole arrays of children. However children will be distributed to new parents.
 
-### 1st possibility of execution
+### Execution (1st form)
 
 ```console
-< stream.jsonl | tipo -c swapConf.yml
+< stream.jsonl | tipo
 ```
 
 The result will be the following
 
-```JSON
-{"company":"Ese1","employees":[{"lastname":"Martin","firstname":"Lebaron","age":36,"children":[{"lastname":"Damien" ,"age":14}]},{"surname":"Josselin","firstname":"Jireau","children":[{"surname":"Alex","age":14},{" name":"Peter","age":9}]}]}
-{"company":"Ese2","employees":[{"surname":"Jérémie","firstname":"Namie","age":42,"children":[{"surname":"Patrice" ,"age":25},{"name":"agathe","age":10},{"name":"Maélie","age":2}]}]}
-{"company":"Ese3","employees":[{"surname":"Océane","firstname":"Dupont","age":42,"children":[{"surname":"Lilie" ,"age":25},{"name":"Alice","age":10}]}]}
+```json
+{"company":"acme","employees":[{"name":"one","children":[{"name":"kid 2"},{"name":"kid 3"}]},{"name":"two","children":[{"name":"child 1"},{"name":"child 2"}]}]}
+{"company":"megacorp","employees":[{"name":"alpha","children":[]},{"name":"beta","children":[{"name":"kid 1"}]}]}
+{"company":"dynatech","employees":[{"name":"first","children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
 ```
 
-N.B.: The tipo command takes the path to the configuration file via the `-c` flag, if no path has been provided it will try to look by default for the swap.yml file which must be in the root of the project .
+N.B.: The tipo command can use the path to the configuration file via the `-c` flag, if no path has been provided it will try to look by default for the swap.yml file which must be in the root of the project.
 
-### 2nd possibility of execution
+## Example 2 : mix the children together
 
-In the case where the configuration file is named "swap.yml", the execution can be done as follows
+With the same data file `stream.jsonl`, consider this TIPO configuration :
+
+```YAML
+version: 1
+seed: 42
+frameSize: 1000
+selectors:
+  - $.employees.*.children.*
+```
+
+In this case we want to mix children together. Siblings will be separated in this scenario because the JSONPath `$.employees.*.children.*` will select each child individualy. However each parent will keep its original number of children.
+
+### Execution (2nd form)
 
 ```console
-< stream.jsonl | type
+cat stream.jsonl | tipo
 ```
 
-## Permutation of an attribute group
+The result will be the following
 
-When the need is to permute a group of attributes in a coherent way, for example the name and the first name of the employees and that one wishes to have an independent permutation of the names of the children of the employees then the configuration file named " swap.yml" will have the following content
+```json
+{"company":"acme","employees":[{"name":"one","children":[{"name":"offspring 2"},{"name":"child 2"}]},{"name":"two","children":[{"name":"child 5"},{"name":"kid 2"},{"name":"child 3"}]}]}
+{"company":"megacorp","employees":[{"name":"alpha","children":[{"name":"kid 3"}]},{"name":"beta","children":[{"name":"kid 1"},{"name":"child 4"}]}]}
+{"company":"dynatech","employees":[{"name":"first","children":[{"name":"child 1"},{"name":"offspring 1"}]},{"name":"second","children":[]}]}
+```
+
+## Example 3 : permutation of a group of attributes
+
+Let's change our dataset example by adding a new information `childnumber`.
+
+```json
+{"company":"acme","employees":[{"name":"one","childnumber":2,"children":[{"name":"child 1"},{"name":"child 2"}]},{"name":"two","childnumber":3,"children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
+{"company":"megacorp","employees":[{"name":"alpha","childnumber":1,"children":[{"name":"kid 1"}]},{"name":"beta","childnumber":2,"children":[{"name":"kid 2"},{"name":"kid 3"}]}]}
+{"company":"dynatech","employees":[{"name":"first","childnumber":2,"children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","childnumber":0,"children":[]}]}
+```
+
+When the need is to permute a group of attributes in a coherent way, for example if `childnumber` and the `children` list must be swapped coherently then the configuration file named `swap.yml` will have the following content :
 
 ```yaml
 version: 1
 seed: 42
 frameSize: 1000
 selectors:
-  - group1:
-    - employees.name.*
-    - employees.firstname.*
-  - employees.children.name.*
+  - group:
+    - $.employees.*.childnumber
+    - $.employees.*.children
 ```
 
-The way to execute is always the same
+### Execution (3rd form)
 
 ```console
-< stream.jsonl | type
+tipo < stream.jsonl
 ```
 
 The result will be the following
 
 ```json
-{"company":"Ese1","employees":[{"lastname":"Josselin","firstname":"Jireau","age":36,"children":[{"lastname":"Patrice" ,"age":14}]},{"surname":"Jérémie","firstname":"Namie","age":57,"children":[{"surname":"Alex","age" :14},{"name":"agathe","age":9}]}]}
-{"company":"Ese2","employees":[{"lastname":"Martin","firstname":"Lebaron","age":42,"children":[{"lastname":"Lilie" ,"age":25},{"name":"Damien","age":10},{"name":"Peter","age":2}]}]}
-{"company":"Ese3","employees":[{"surname":"Océane","firstname":"Dupont","age":42,"children":[{"surname":"Alice" ,"age":25},{"name":"Maélie","age":10}]}]}
+{"company":"acme","employees":[{"name":"one","childnumber":2,"children":[{"name":"kid 2"},{"name":"kid 3"}]},{"name":"two","childnumber":2,"children":[{"name":"child 1"},{"name":"child 2"}]}]}
+{"company":"megacorp","employees":[{"name":"alpha","childnumber":0,"children":[]},{"name":"beta","childnumber":1,"children":[{"name":"kid 1"}]}]}
+{"company":"dynatech","employees":[{"name":"first","childnumber":2,"children":[{"name":"offspring 1"},{"name":"offspring 2"}]},{"name":"second","childnumber":3,"children":[{"name":"child 3"},{"name":"child 4"},{"name":"child 5"}]}]}
 ```
 
-## Swap Multiple Attribute Groups
+## Example 4 : mix multiple groups and attributes
 
 Suppose the following incoming stream is stored in a file named stream.jsonl
 
 ```json
-{"company":"company1","employees":[{"lastname":"Martin","firstname":"Lebaron","nationality":"italian","age":36,"children":[ {"name":"Damien","age":14}]}]}
-{"company":"company2","employees":[{"surname":"Jérémie","firstname":"Namie","nationality":"French","age":44,"children":[ {"name":"Patrice","age":25},{"name":"agathe","age":10},{"name":"Maélie","age":2}]}] }
-{"company":"company3","employees":[{"surname":"Océane","firstname":"Dupont","nationality":"Spanish","age":41,"children":[ {"name":"Lilie","age":25},{"name":"Alice","age":10}]}]}
+{"company":"acme","employees":[{"name":"one","surname":"ONE","age":20,"nationality":"Kenyan"},{"name":"two","surname":"TWO","age":30,"nationality":"Icelandic"}]}
+{"company":"megacorp","employees":[{"name":"alpha","surname":"ALPHA","age":40,"nationality":"Colombian"},{"name":"beta","surname":"BETA","age":50,"nationality":"Malaysian"}]}
+{"company":"dynatech","employees":[{"name":"first","surname":"FIRST","age":60,"nationality":"Belgian"},{"name":"second","surname":"SECOND","age":70,"nationality":"Egyptian"}]}
 ```
 
 The following corresponding configuration file is named configuration.yml
@@ -122,13 +150,13 @@ version: 1
 seed: 42
 frameSize: 1000
 selectors:
-  - group1:
-    - employees.name.*
-    - employees.firstname.*
-  - group2:
-    - employees.age.*
-    - employees.nationality.*
-  - employees.children.*
+  - group1: # name and surname will be swapped together
+    - employees.*.name
+    - employees.*.surname
+  - group2: # age and nationality will be swapped together
+    - employees.*.age
+    - employees.*.nationality
+  - company
 ```
 
 The permutation of the two groups will be done independently. The execution is done as follows
@@ -140,12 +168,39 @@ The permutation of the two groups will be done independently. The execution is d
 And the result will be the following
 
 ```json
-{"company":"company1","employees":[{"lastname":"Jérémie","firstname":"Namie","nationality":"Spanish","age":41,"children":[ {"name":"Damien","age":14}]}]}
-{"company":"company2","employees":[{"surname":"Océane","firstname":"Dupont","nationality":"italian","age":36,"children":[ {"name":"Patrice","age":25},{"name":"agathe","age":10},{"name":"Maélie","age":2}]}] }
-{"company":"company3","employees":[{"lastname":"Martin","firstname":"Lebaron","nationality":"French","age":44,"children":[ {"name":"Lilie","age":25},{"name":"Alice","age":10}]}]}
+{"company":"acme","employees":[{"name":"beta","surname":"BETA","age":50,"nationality":"Malaysian"},{"name":"one","surname":"ONE","age":30,"nationality":"Icelandic"}]}
+{"company":"megacorp","employees":[{"name":"second","surname":"SECOND","age":70,"nationality":"Egyptian"},{"name":"alpha","surname":"ALPHA","age":20,"nationality":"Kenyan"}]}
+{"company":"dynatech","employees":[{"name":"first","surname":"FIRST","age":60,"nationality":"Belgian"},{"name":"two","surname":"TWO","age":40,"nationality":"Colombian"}]}
 ```
 
 Note that the age and nationality fields have been swapped consistently and independently of the surname and first name fields, which have also been swapped consistently.
+
+## Different ways to configure a group
+
+In previous examples, this kind of group configuration has been presented.
+
+```yaml
+selectors:
+  - groupname:
+    - employees.*.name
+    - employees.*.surname
+```
+
+But there is other ways to configure a group.
+
+1- **Inline array**
+
+```yaml
+selectors:
+  - ["employees.*.name", "employees.*.surname"]
+```
+
+2- **Inline array with map**
+
+```yaml
+selectors:
+  - groupname: ["employees.*.name", "employees.*.surname"]
+```
 
 ## Contributors
 
